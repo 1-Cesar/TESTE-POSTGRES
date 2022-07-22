@@ -3,7 +3,6 @@ package br.com.vemser.devlandapi.service;
 import br.com.vemser.devlandapi.dto.UsuarioCreateDTO;
 import br.com.vemser.devlandapi.dto.UsuarioDTO;
 import br.com.vemser.devlandapi.entity.Usuario;
-import br.com.vemser.devlandapi.enums.TipoMensagem;
 import br.com.vemser.devlandapi.enums.TipoUsuario;
 import br.com.vemser.devlandapi.exceptions.RegraDeNegocioException;
 import br.com.vemser.devlandapi.repository.UsuarioRepository;
@@ -29,10 +28,10 @@ public class UsuarioService {
     private EmailService emailService;
 
     public List<UsuarioDTO> listar() throws RegraDeNegocioException {
-        if (usuarioRepository.listar().size() == 0) {
+        if (usuarioRepository.findAll().size() == 0) {
             throw new RegraDeNegocioException("Nenhum usuario encontrado");
         } else {
-            return usuarioRepository.listar().stream()
+            return usuarioRepository.findAll().stream()
                     .map(usuario -> objectMapper.convertValue(usuario, UsuarioDTO.class))
                     .collect(Collectors.toList());
         }
@@ -40,7 +39,7 @@ public class UsuarioService {
 
     public List<UsuarioDTO> listarUsuario(Integer id) throws RegraDeNegocioException {
         localizarUsuario(id);
-        return usuarioRepository.listarUsuario(id).stream()
+        return usuarioRepository.findById(id).stream()
                 .filter(usuario -> usuario.getIdUsuario().equals(id))
                 .map(usuario -> objectMapper.convertValue(usuario, UsuarioDTO.class))
                 .collect(Collectors.toList());
@@ -48,27 +47,30 @@ public class UsuarioService {
 
     public void delete(Integer id) throws RegraDeNegocioException {
         Usuario usuarioRecuperado = localizarUsuario(id);
-        usuarioRepository.remover(id);
-        String tipoMensagem = TipoMensagem.DELETE.getTipo();
-        emailService.sendEmailUsuario(usuarioRecuperado, tipoMensagem);
+        usuarioRepository.delete(usuarioRecuperado);
+//        String tipoMensagem = TipoMensagem.DELETE.getTipo();
+//        emailService.sendEmailUsuario(usuarioRecuperado, tipoMensagem);
     }
 
-    public UsuarioDTO editar(Integer id, UsuarioDTO usuarioDTO) throws RegraDeNegocioException {
-        localizarUsuario(id);
-        Usuario usuario = usuarioRepository.editar(id, objectMapper.convertValue(usuarioDTO, Usuario.class));
-        String tipoMensagem = TipoMensagem.UPDATE.getTipo();
-        emailService.sendEmailUsuario(usuario, tipoMensagem);
-        usuarioDTO =  objectMapper.convertValue(usuario, UsuarioDTO.class);
-        return usuarioDTO;
+    public UsuarioDTO editar(Integer id, UsuarioCreateDTO usuarioCreateDTO) throws RegraDeNegocioException {
+        Usuario pessoaEntity = localizarUsuario(id);
+
+        pessoaEntity.setNome(usuarioCreateDTO.getNome());
+        pessoaEntity.setEmail(usuarioCreateDTO.getEmail());
+
+
+        usuarioRepository.save(pessoaEntity);
+
+        return retornarDTO(pessoaEntity);
     }
 
     public UsuarioCreateDTO adicionar(UsuarioCreateDTO usuarioCreateDTO) throws RegraDeNegocioException {
 
         if (usuarioCreateDTO.getTipoUsuario() == TipoUsuario.DEV) {
             if (usuarioCreateDTO.getCpfCnpj().length() == 11 && ValidaCPF.isCPF(usuarioCreateDTO.getCpfCnpj())) {
-                Usuario usuario = usuarioRepository.adicionar(objectMapper.convertValue(usuarioCreateDTO, Usuario.class));
-                String tipoMensagem = TipoMensagem.CREATE.getTipo();
-                emailService.sendEmailUsuario(usuario, tipoMensagem);
+                Usuario usuario = usuarioRepository.save(objectMapper.convertValue(usuarioCreateDTO, Usuario.class));
+//                String tipoMensagem = TipoMensagem.CREATE.getTipo();
+//                emailService.sendEmailUsuario(usuario, tipoMensagem);
                 return objectMapper.convertValue(usuario, UsuarioDTO.class);
             } else {
                 throw new RegraDeNegocioException("CPF Inválido");
@@ -76,9 +78,9 @@ public class UsuarioService {
         }
 
         if (usuarioCreateDTO.getCpfCnpj().length() == 14 && ValidaCNPJ.isCNPJ(usuarioCreateDTO.getCpfCnpj())) {
-            Usuario usuarioEmpresa = usuarioRepository.adicionar(objectMapper.convertValue(usuarioCreateDTO, Usuario.class));
-            String tipoMensagem = TipoMensagem.CREATE.getTipo();
-            emailService.sendEmailUsuario(usuarioEmpresa, tipoMensagem);
+            Usuario usuarioEmpresa = usuarioRepository.save(objectMapper.convertValue(usuarioCreateDTO, Usuario.class));
+//            String tipoMensagem = TipoMensagem.CREATE.getTipo();
+//            emailService.sendEmailUsuario(usuarioEmpresa, tipoMensagem);
             return objectMapper.convertValue(usuarioEmpresa, UsuarioDTO.class);
         } else {
             throw new RegraDeNegocioException("CNPJ Inválido");
@@ -218,10 +220,18 @@ public class UsuarioService {
     }
 
    public Usuario localizarUsuario (Integer idUsuario) throws RegraDeNegocioException {
-        Usuario usuarioRecuperado = usuarioRepository.listar().stream()
+        Usuario usuarioRecuperado = usuarioRepository.findAll().stream()
                 .filter(usuario -> usuario.getIdUsuario().equals(idUsuario))
                 .findFirst()
                 .orElseThrow(() -> new RegraDeNegocioException("Usuário não encontrado"));
         return usuarioRecuperado;
    }
+
+    public UsuarioDTO retornarDTO (Usuario pessoaEntity) {
+        return objectMapper.convertValue(pessoaEntity, UsuarioDTO.class);
+    }
+
+    public Usuario retornarPessoaEntity (UsuarioCreateDTO pessoaDTO) {
+        return objectMapper.convertValue(pessoaDTO, Usuario.class);
+    }
 }
